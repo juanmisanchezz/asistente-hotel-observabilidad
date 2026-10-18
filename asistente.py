@@ -10,6 +10,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 import json
+from trazas import crear_config, enviar
 
 # Cargar la clave y crear el modelo (igual que en la 1b)
 load_dotenv()
@@ -152,12 +153,13 @@ with SqliteSaver.from_conn_string("data/memoria.sqlite") as checkpointer:
 
     # ---------- CHAT EN LA TERMINAL (varios turnos) ----------
     if __name__ == "__main__":
-        config = {"configurable": {"thread_id": input("Nombre de la conversación: ")}}
+        conversacion = input("Nombre de la conversación: ")
         print("Recepción del hotel. Escribe 'salir' para terminar.")
         while True:
             mensaje = input("Tú: ")
             if mensaje.lower() == "salir":
                 break
+            config = crear_config(conversacion, "v1-local")
             resultado = grafo.invoke({"messages": [HumanMessage(content=mensaje)]}, config)
             if resultado["llamadas_herramientas"] > 0:
                 ruta = "usó herramienta"
@@ -165,3 +167,4 @@ with SqliteSaver.from_conn_string("data/memoria.sqlite") as checkpointer:
                 ruta = "contestó directo"
             print("Recepción:", resultado["messages"][-1].content)
             print(f"   (ruta: {ruta})")
+            enviar()
