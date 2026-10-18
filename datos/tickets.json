@@ -1,0 +1,5 @@
+{
+  "T-100": {"estado": "en curso", "asunto": "Llave de la puerta electronica no abre", "articulo": "A-10", "actualizacion": "Los tecnicos están revisando la llave y cerradura. Se espera el asunto resuelto en un par de horas."},
+  "T-200": {"estado": "resuelto", "asunto": "Aire acondicionado no funciona", "articulo": "A-20", "actualizacion": "El tecnico lo ha arreglado y funciona a la perfección"},
+  "T-300": {"estado": "pendiente", "asunto": "Teléfono recepcion", "articulo": "A-30", "actualizacion": "El telefono sigue sin funcionar, parece ser que no tiene cobertura"}
+}

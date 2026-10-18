@@ -1,0 +1,8 @@
+# Librerías del proyecto (mismas versiones que en la clase 6)
+langgraph==1.2.11
+langchain-core==1.5.5
+langchain-openrouter==0.2.8
+python-dotenv==1.2.3
+langgraph-checkpoint-sqlite
+langsmith==0.11.0
+langfuse==4.14.4

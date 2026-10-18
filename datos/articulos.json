@@ -1,0 +1,7 @@
+{
+  "A-10": {"titulo": "Recuperar acceso a la habitacion", "texto": "Utiliza la tarjeta sin tener el movil al lado ya que el NFC puede interferir en la señal de la tarjeta con la puerta, si persiste acude a recepcion."},
+  "A-20": {"titulo": "Manual aire acondicionado", "texto": "El mando está en la mesilla de noche. Elige el modo frío (copo de nieve) y una temperatura entre 22 y 24 °C. Mantén puertas y ventanas cerradas: el aire se apaga solo si están abiertas. Si no enfría tras 15 minutos, avisa a recepción."},
+  "A-30": {"titulo": "Llamar a Atencion recepcion", "texto": "Desde el teléfono de la habitación, marca el 9 para hablar con recepción (24 horas). Si el teléfono no tiene línea, llama desde tu móvil al +34 950 000 000 o baja directamente a recepción, en la planta baja."},
+  "A-40": {"titulo": "Wifi", "texto": "La red WiFi se llama : hotelpark-900 y la contraseña se envia al correo al hacer el checking"},
+  "A-50": {"titulo": "Desayuno", "texto": " El desayuno se da en el comedor central de 8:00 de la mañana a 11:00 de la mañana"}
+}

@@ -1,0 +1,13 @@
+# Claves: nunca se suben
+.env
+
+# Entorno virtual de Python
+.venv/
+
+# Memoria de las conversaciones (SQLite)
+data/
+*.sqlite
+
+# Archivos temporales de Python
+__pycache__/
+.DS_Store
