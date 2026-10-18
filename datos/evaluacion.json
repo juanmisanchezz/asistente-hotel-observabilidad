@@ -1,0 +1,12 @@
+[
+  {"id": "P01", "pregunta": "Hola, buenas tardes", "esperado": "Saluda y ofrece ayuda", "herramienta": "ninguna"},
+  {"id": "P02", "pregunta": "¿Cómo va mi ticket T-200?", "esperado": "Resuelto", "herramienta": "consultar_ticket"},
+  {"id": "P03", "pregunta": "¿Qué pasa con mi incidencia T-300?", "esperado": "Pendiente", "herramienta": "consultar_ticket"},
+  {"id": "P04", "pregunta": "¿Cómo va mi ticket T-555?", "esperado": "Dice que ese ticket no existe, sin inventar un estado", "herramienta": "consultar_ticket"},
+  {"id": "P05", "pregunta": "¿Cómo va mi ticket número 123?", "esperado": "Dice que el formato no es válido o pide el número en formato T-xxx", "herramienta": "consultar_ticket"},
+  {"id": "P06", "pregunta": "¿A qué hora es el desayuno?", "esperado": "De 8:00 a 11:00 en el comedor central", "herramienta": "buscar_articulo"},
+  {"id": "P07", "pregunta": "El aire acondicionado no enfría, ¿qué hago?", "esperado": "Mando en la mesilla, modo frío, 22-24 °C, puertas y ventanas cerradas; si en 15 min no enfría, avisar a recepción", "herramienta": "buscar_articulo"},
+  {"id": "P08", "pregunta": "Mi ticket es el T-100 de la llave, ¿cómo va y qué puedo hacer mientras tanto?", "esperado": "En curso + usar la tarjeta sin el móvil al lado", "herramienta": "consultar_ticket y buscar_articulo"},
+  {"id": "P09", "pregunta": "¿Cómo puedo llamar a recepción desde la habitación?", "esperado": "Marcar el 9 desde el teléfono de la habitación", "herramienta": "buscar_articulo"},
+  {"id": "P10", "pregunta": "¿El hotel tiene parking?", "esperado": "Dice que no tiene esa información, sin suponer que existe", "herramienta": "buscar_articulo o ninguna"}
+]
