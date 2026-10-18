@@ -22,10 +22,10 @@ cliente_langsmith = Client(hide_inputs=ocultar, hide_outputs=ocultar)
 oyente_langsmith = LangChainTracer(client=cliente_langsmith, project_name=os.environ["LANGSMITH_PROJECT"])
 
 
-def crear_config(thread_id, prompt_version):
+def crear_config(thread_id, prompt_version, prompt_fuente, prompt_texto):
     query_id = str(uuid.uuid4())
     return {
-        "configurable": {"thread_id": thread_id},
+        "configurable": {"thread_id": thread_id, "prompt": prompt_texto},
         "callbacks": [oyente_langfuse, oyente_langsmith],
         "run_name": "asistente-hotel",
         "tags": ["p6", prompt_version],
@@ -34,6 +34,7 @@ def crear_config(thread_id, prompt_version):
             "thread_id": thread_id,
             "modelo": os.environ["MODEL_ID"],
             "prompt_version": prompt_version,
+            "prompt_fuente": prompt_fuente,
             "langfuse_session_id": thread_id,
         },
     }
@@ -43,3 +44,12 @@ def enviar():
     oyente_langsmith.wait_for_futures()
     cliente_langsmith.flush()
     langfuse.flush()
+
+
+def cargar_prompt(version, fuente):
+    if fuente == "langfuse":
+        prompt = langfuse.get_prompt("asistente-hotel", label=version, cache_ttl_seconds=0)
+        return prompt.prompt
+    else:
+        prompt = cliente_langsmith.pull_prompt("asistente-hotel:" + version)
+        return prompt.messages[0].prompt.template

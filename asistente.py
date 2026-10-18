@@ -10,7 +10,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 import json
-from trazas import crear_config, enviar
+from trazas import crear_config, enviar, cargar_prompt
 
 # Cargar la clave y crear el modelo (igual que en la 1b)
 load_dotenv()
@@ -71,28 +71,20 @@ class Estado(TypedDict):
     errores: list
 
 
-# Pega aquí TU prompt de la 1b, y añade al final: "Si no sabes un dato, usa las herramientas; nunca lo inventes."
-INSTRUCCIONES = SystemMessage(content="""Eres el recepcionista del hotel llamado Juan
-                                   y tienes mas de 10 años de experiencia en el sector.
-                                   Debes hablar con un tono amable y directo. Frases cortas.
-                                   Limita la interaccion a 3 frases máximo.
-                                   Si no sabes algo, no inventes simplemente di que no sabes dar esa informacion
-                                   """)
-
-
 # ---------- NODOS (las cajas) ----------
 def inicio(estado: Estado) -> dict:
     # Cada pregunta nueva empieza con el contador a 0 (la conversación NO se borra)
     return {"llamadas_herramientas": 0, "errores": []}
 
 
-def chatbot(estado: Estado) -> dict:
-    # Igual que en la 1b, pero con el modelo que conoce las herramientas
+def chatbot(estado: Estado, config) -> dict:
     count = estado.get("llamadas_herramientas" , 0)
+    instrucciones = SystemMessage(content=config["configurable"]["prompt"])
+
     if count >= 2:
-        respuesta = modelo.invoke([INSTRUCCIONES] + estado["messages"])
+        respuesta = modelo.invoke([instrucciones] + estado["messages"])
     else:
-        respuesta = modelo_con_herramientas.invoke([INSTRUCCIONES] + estado["messages"])
+        respuesta = modelo_con_herramientas.invoke([instrucciones] + estado["messages"])
 
     return {"messages": [respuesta]}
 
@@ -154,12 +146,17 @@ with SqliteSaver.from_conn_string("data/memoria.sqlite") as checkpointer:
     # ---------- CHAT EN LA TERMINAL (varios turnos) ----------
     if __name__ == "__main__":
         conversacion = input("Nombre de la conversación: ")
+        version = input("Versión del prompt (v1/v2): ")
+        fuente = input("Desde qué web (langfuse/langsmith): ")
+        texto_prompt = cargar_prompt(version, fuente)
+
         print("Recepción del hotel. Escribe 'salir' para terminar.")
         while True:
             mensaje = input("Tú: ")
             if mensaje.lower() == "salir":
                 break
-            config = crear_config(conversacion, "v1-local")
+            config = crear_config(conversacion, version, fuente, texto_prompt)
+
             resultado = grafo.invoke({"messages": [HumanMessage(content=mensaje)]}, config)
             if resultado["llamadas_herramientas"] > 0:
                 ruta = "usó herramienta"
