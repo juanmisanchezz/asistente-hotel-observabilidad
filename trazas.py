@@ -6,6 +6,7 @@ from langfuse import Langfuse
 from langfuse.langchain import CallbackHandler
 from langsmith import Client
 from langchain_core.tracers.langchain import LangChainTracer
+from privacidad import ocultar, ocultar_langfuse
 
 load_dotenv()
 
@@ -13,11 +14,11 @@ load_dotenv()
 os.environ["LANGSMITH_TRACING"] = "false"
 
 # Langfuse: el cliente (la conexión) y su oyente
-langfuse = Langfuse()
+langfuse = Langfuse(mask=ocultar_langfuse)
 oyente_langfuse = CallbackHandler()
 
 # LangSmith: el cliente (la conexión) y su oyente
-cliente_langsmith = Client()
+cliente_langsmith = Client(hide_inputs=ocultar, hide_outputs=ocultar)
 oyente_langsmith = LangChainTracer(client=cliente_langsmith, project_name=os.environ["LANGSMITH_PROJECT"])
 
 
