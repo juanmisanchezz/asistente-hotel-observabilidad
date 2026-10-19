@@ -1,28 +1,14 @@
-# Asistente de recepción de hotel con LangGraph
+# Observabilidad del asistente del hotel (Langfuse + LangSmith)
 
-Proyecto 5 del máster de AI Engineering (thePower): LangGraph ("Langchamps").
+Proyecto 6 del máster de AI Engineering de thePower. *English version below.*
 
-*English version below.*
+En el [proyecto 5](https://github.com/juanmisanchezz/asistente-hotel-langgraph) hice con LangGraph un recepcionista de hotel que funciona en la terminal: contesta directamente o consulta una herramienta (el estado de un ticket o un artículo de ayuda). El problema es que, cuando respondía mal o tardaba, no tenía forma de saber por qué.
 
-Un chat en la terminal que hace de recepcionista de un hotel ficticio. El chat decide en cada mensaje si contesta directamente o si consulta una herramienta: el estado de un ticket de incidencia o un artículo de ayuda (wifi, desayuno, aire acondicionado, etc). Recuerda cada conversación aunque se cierre el programa, solo usa como mucho 2 herramientas por pregunta y si una herramienta falla, responde con un error controlado en vez de romperse. El modelo es Claude Haiku a través de OpenRouter.
+En este proyecto lo he conectado a Langfuse y a LangSmith para ver cada paso de cada pregunta: qué le llega al modelo, qué herramienta llama, cuánto tarda y cuánto cuesta. También he guardado dos versiones del prompt en las dos webs para compararlas con las mismas preguntas, y he hecho que los emails y las claves se oculten antes de enviar nada.
 
-## Ejemplo de uso
+Los datos del hotel son inventados. El modelo es Claude Haiku a través de OpenRouter.
 
-```
-Nombre de la conversación: hola
-Recepción del hotel. Escribe 'salir' para terminar.
-Tú: como va mi ticket t-199?
-Recepción: Lo siento, no encuentro el ticket T-199 en nuestro sistema. ¿Puede revisar si el número está bien escrito? Con gusto le ayudo a buscarlo de nuevo.
-   (ruta: usó herramienta)
-Tú: perdon, t-100
-Recepción: El ticket T-100 está en curso, así que su incidencia se está atendiendo. No tengo más detalles sobre el avance.
-   (ruta: usó herramienta)
-Tú: salir
-```
-
-Capturas de cada etapa en [capturas/](capturas/).
-
-## Esquema del grafo
+## Las trazas
 
 ```mermaid
 flowchart LR
@@ -33,133 +19,129 @@ flowchart LR
     C -- "no pide nada" --> E([END])
 ```
 
-- **inicio:** pone a 0 el contador de herramientas y vacía la lista de errores en cada pregunta nueva (la conversación no se borra)
-- **chatbot:** llama a Claude. Si el contador ya va por 2, lo llama **sin herramientas**, así que tiene que contestar
-- **herramientas:** ejecuta las herramientas que pidió Claude, suma al contador y, si ya van 2, contesta "límite agotado" sin ejecutar
-- **decidir** (la flecha condicional): si el último mensaje de Claude pide herramientas va a `herramientas`; si no, termina
+Cada pregunta aparece una sola vez en cada web, con el nombre `asistente-hotel`. Dentro se ve el recorrido entero: la pregunta, cada llamada al modelo con sus tokens y su coste, la herramienta que eligió con lo que le pidió y lo que le devolvió, y la respuesta final.
 
-### Ejemplos de rutas
+A cada traza le añado el `query_id` (un identificador por pregunta), la conversación (`thread_id`, que en Langfuse también sirve para agruparla en *Sessions*), el modelo y la versión del prompt con la web de la que se descargó.
 
-| Pregunta | Ruta | Resultado |
+Al principio cada pregunta me salía dos veces en LangSmith, porque además de mi oyente estaba activo su registro automático. Lo apagué con `LANGSMITH_TRACING=false`.
+
+Capturas: [Langfuse](capturas/1-langfuse-traza.png) · [LangSmith](capturas/1-langsmith-traza.png)
+
+## Las dos versiones del prompt
+
+La v1 es el prompt del proyecto 5. Para hacer la v2 usé 4 preguntas de prueba (reservar mesa, wifi, cambio de habitación y piscina), distintas de las que luego usé para evaluar. Con la v1 el asistente decía cosas como "soy recepción… pregunte en recepción", no daba una solución concreta y con la piscina daba a entender que el hotel tenía una.
+
+En mi primer intento de v2 escribí "usando el artículo A-30" y el modelo se lo dijo así, tal cual, al cliente. Aprendí que en el prompt hay que explicar qué tiene que hacer y qué no debe decir, no cómo funciona por dentro.
+
+Las dos versiones están subidas a Langfuse y a LangSmith. Al arrancar el chat eliges versión y web, y el prompt se descarga de ahí. Así cada respuesta queda ligada a la versión que la produjo ([captura](capturas/3-traza-con-version.png)).
+
+## Comparación con 10 preguntas
+
+Antes de ejecutar nada escribí los criterios en [criterios.md](criterios.md): una respuesta es un acierto si contesta lo que se pregunta, usa la herramienta cuando toca y no se inventa nada. Las 10 preguntas están en `datos/evaluacion.json` y las pasé con las dos versiones, el mismo modelo, `temperature=0` y una conversación nueva cada vez. Todo queda en `resultados/resultados.csv`.
+
+| | v1 | v2 |
 |---|---|---|
-| "Hola" | inicio → chatbot → END | Contesta directo, sin herramientas |
-| "¿Cómo va mi ticket T-100?" | inicio → chatbot → herramientas (`consultar_ticket`) → chatbot → END | "Está en curso" (sale del JSON, no se lo inventa) |
-| "¿Cómo va mi ticket T-999?" | inicio → chatbot → herramientas → chatbot → END | "No encuentro ese ticket" |
-| Claude pide 3 herramientas a la vez (probado en los tests) | inicio → chatbot → herramientas (ejecuta 2, la 3.ª recibe "límite agotado") → chatbot **sin herramientas** → END | Termina siempre, sin bucles |
+| Aciertos | 8/10 | 9/10 |
+| Duración media | 3,06 s | 2,45 s |
+| Llamadas a herramientas | 9 | 10 |
+| Errores | 0 | 0 |
+| Tokens | 15.580 | 19.591 |
+| Coste | 0,0022 $ | 0,0027 $ |
 
-## Estructura del proyecto
+La v1 falla en la P03 porque añade "le avisaremos en cuanto haya novedades", algo que no está en los datos. Las dos fallan en la P05: cuando el cliente dice "mi ticket número 123", lo convierten en T-123 y responden que no existe, en vez de decirle que el formato no es válido. Eso no lo arregla el prompt; tendría que arreglarlo la herramienta.
+
+La v2 acierta más, pero gasta un 26 % más de tokens y un 19 % más de dinero, porque su prompt es más largo y en la pregunta del parking consulta un artículo más para dar el teléfono de contacto. No es más lenta: la diferencia de tiempos depende sobre todo del proveedor (una sola pregunta de la v1 tardó 9 segundos).
+
+Al principio el coste no salía en ninguna de las dos webs. Tuve que poner a mano el precio de OpenRouter (0,10 $ por millón de tokens de entrada y 0,50 $ de salida) en *Model Definitions* de Langfuse y en *Model Pricing* de LangSmith. Ojo, que solo se calcula para las trazas que llegan después de configurarlo. LangSmith da el mismo coste que mi CSV; Langfuse da un 10 % menos, porque no cobra los tokens de razonamiento.
+
+## Un fallo y un retraso provocados
+
+Añadí dos variables para estropear la herramienta a propósito: `FORZAR_FALLO_HERRAMIENTA=1` hace que lance un error, y `RETRASO_HERRAMIENTA_SEGUNDOS=5` hace que el nodo espere 5 segundos antes de usarla. En los dos casos pregunté por el ticket T-100.
+
+Con el fallo ([Langfuse](capturas/5-langfuse-fallo.png) · [LangSmith](capturas/5-langsmith-fallo.png)), el asistente contesta que no ha podido consultar el ticket. Si se abre el nodo `herramientas`, se ve que `consultar_ticket` devolvió "Error controlado. No se obtuvo información.". La traza no sale en rojo, porque el `try/except` que hice en el proyecto 5 convierte el error en un mensaje y el grafo sigue. Es bueno para el cliente, pero obliga a entrar en el nodo para ver qué ha pasado.
+
+Con el retraso ([Langfuse](capturas/5-langfuse-retraso.png) · [LangSmith](capturas/5-langsmith-retraso.png)), la pregunta tarda 7,72 s en vez de los 4,49 s de la prueba del fallo. El nodo `herramientas` marca 5,01 s, mientras que `consultar_ticket`, dentro de él, marca 0,00 s. O sea, la espera está en el nodo, no en la herramienta.
+
+## Privacidad
+
+En `privacidad.py` hay una función, `ocultar()`, que cambia los emails por `[EMAIL_OCULTO]` y los campos tipo `api_key` o `password` por `[OCULTO]`. En Langfuse la conecto con su opción de masking y en LangSmith con `hide_inputs` y `hide_outputs`.
+
+Lo probé con "Mi email es ana.prueba@ejemplo.com, ¿cómo va mi ticket T-100?" y en las dos webs aparece `[EMAIL_OCULTO]` ([Langfuse](capturas/2-langfuse-email-oculto.png) · [LangSmith](capturas/2-langsmith-email-oculto.png)). Lo que no tapa es lo que el modelo deduce: como el modelo sí ve el mensaje completo, contestó "Hola Ana", y ese nombre sí llega a las trazas. En un caso real habría que filtrar también los nombres.
+
+Las claves están en un archivo local que no se sube al repositorio, y en la metadata solo pongo identificadores técnicos.
+
+Qué guardaría y cuánto tiempo:
+- Las trazas, ya sin datos personales, entre 14 y 30 días, solo para revisar errores recientes.
+- Las métricas (tiempos, tokens, coste y aciertos de cada versión), sin texto de los clientes, un año, para comparar versiones.
+- Emails, teléfonos, nombres de clientes o claves, nunca.
+
+Los proyectos de las dos webs son privados.
+
+## Langfuse o LangSmith
+
+Con las dos llegué al nodo exacto donde estaba el fallo o el retraso. Las diferencias que noté:
+
+- LangSmith enseña por defecto una fila por pregunta y se ve más limpio. Langfuse enseña todos los pasos sueltos, y hay que filtrar por "observación raíz" o ir a *Sessions*.
+- Para ver qué paso tarda, en Langfuse uso la vista *Timeline* y en LangSmith *Waterfall*. En LangSmith además tienes la metadata a la vista en el mismo panel.
+- En las dos hay que configurar el precio del modelo. Langfuse no tiene en cuenta los tokens de razonamiento.
+- Las dos guardan versiones del prompt. LangSmith no deja mover un tag que ya existe, y tuve que borrar y volver a subir el prompt.
+
+Para revisar pregunta a pregunta me quedo con LangSmith; para ver una conversación entera, con Langfuse.
+
+## Otros problemas que me encontré
+
+- El `python3` del Mac era el 3.9 y LangGraph no se instalaba; tuve que crear el entorno con `python3.12`.
+- El traductor de Chrome me traducía también el contenido de Langfuse ("ticket" → "billete"). Para las capturas lo desactivé.
+
+## Archivos
 
 ```
-asistente-hotel-langgraph/
-├── README.md
-├── asistente.py            # el asistente completo (etapas 2-5)
-├── etapas/
-│   ├── 01_grafo_fijo.py    # etapa 1a: grafo con respuesta fija, sin modelo
-│   └── 02_grafo_modelo.py  # etapa 1b: el nodo ya llama a Claude
-├── datos/
-│   ├── tickets.json        # tickets ficticios T-100, T-200, T-300
-│   └── articulos.json      # artículos de ayuda ficticios A-10 … A-50
-├── tests/
-│   └── test_asistente.py   # 4 tests sin llamar a Claude
-├── capturas/
-├── requirements.txt        # librerías (mismas versiones que en clase)
-├── requirements.lock       # versiones exactas de todo (archivo de bloqueo)
-├── .env.example            # plantilla de la clave, sin clave
-└── .gitignore
+asistente-hotel-observabilidad/
+├── asistente.py            # el chat: grafo del P5, prompts descargados, fallo y retraso
+├── trazas.py               # conexión con Langfuse y LangSmith y metadata
+├── privacidad.py           # ocultar emails y claves
+├── registrar_prompts.py    # sube v1 y v2 a las dos webs (una sola vez)
+├── comparar.py             # pasa las 10 preguntas con v1 y v2 y guarda el CSV
+├── criterios.md            # criterios de acierto
+├── prompts/                # v1.txt y v2.txt
+├── datos/                  # tickets, artículos y preguntas de evaluación
+├── resultados/             # resultados.csv
+├── tests/                  # tests del P5
+└── capturas/
 ```
 
-## Etapas
+## Cómo ejecutarlo
 
-Cada etapa tiene su commit.
+```
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.lock
+```
 
-| Etapa | Qué añade | Lo que pasó al probarla |
-|---|---|---|
-| 0 | Entorno, dependencias bloqueadas y clave fuera del repo | Al principio pegué la clave en la plantilla que se sube; lo arreglé antes del primer commit |
-| 1a | Grafo `START → recepcion → END` con respuesta fija | Pregunte lo que pregunte, contesta siempre lo mismo |
-| 1b | El nodo llama a Claude (`MODEL_ID`) | Le pregunté a qué hora es el desayuno y **se lo inventó** con total seguridad |
-| 2 | Chatbot de varios turnos con flecha condicional (contestar o usar herramienta) | Con la herramienta ya no se inventa el horario |
-| 3 | Memoria persistente con `SqliteSaver` y `thread_id` por conversación | Sobrevive al reinicio, no mezcla conversaciones y una conversación nueva empieza vacía |
-| 4 | Herramientas `consultar_ticket` y `buscar_articulo` sobre JSON ficticio | Ticket que existe → su estado; ticket que no existe → lo dice, no inventa |
-| 5 | Límite de 2 herramientas, fallos controlados y tests | `python -m unittest discover -s tests` → 4 tests OK |
+Copia la plantilla de variables del repositorio, rellénala con tus claves de OpenRouter, Langfuse y LangSmith, el `MODEL_ID` y el `LANGSMITH_PROJECT`, y después:
 
-## Piezas
-
-- **Estado:** `messages` (la conversación), `llamadas_herramientas` (el contador) y `errores` (`"limite_agotado"` o `"fallo_herramienta"`)
-- **Herramientas de solo lectura:** `consultar_ticket` y `buscar_articulo` comprueban primero el formato (`T-` + 3 números, `A-` + 2 números) y después si existe. Con un formato malo responden "Formato no valido" y con uno que no existe lo dicen, sin romperse
-- **Memoria:** `SqliteSaver` guarda cada conversación en `data/memoria.sqlite` con su `thread_id`. Al arrancar el chat se pide el nombre de la conversación
-- **Freno:** el contador vive en el estado; el nodo de herramientas no ejecuta más de 2 y el chatbot, al llegar a 2, se llama sin herramientas
-- **Fallos controlados:** un `try/except` alrededor de cada herramienta. Si revienta, Claude recibe "Error controlado" y el fallo se apunta en `errores`
-
-## Decisiones
-
-- **Primero sin IA (1a) y luego con IA (1b):** para entender las cajas, las flechas y el estado antes de meter el modelo
-- **El límite va en el código, no en el prompt:** probé a poner en el prompt "si no sabes algo, no lo inventes" y siguió inventándose el desayuno (y además ofreció reservar mesa, algo que no puede hacer). Una regla en el prompt es una sugerencia; el freno y los datos tienen que venir del código y de las herramientas
-- **Modelo configurable con `MODEL_ID`:** se cambia de modelo sin tocar el código
-- **Datos en JSON y no en el código:** se pueden añadir tickets y artículos sin tocar el programa
-- **La lista de artículos va en la descripción de `buscar_articulo`:** así Claude sabe qué identificador pedir. Con 5 artículos basta; con cientos habría que buscar por tema, y con miles, RAG (el enunciado no lo pide)
-- **Tests sin red:** prueban mi código (validación, freno y `try/except`), no las respuestas de Claude, que no son predecibles. Se llama a las funciones con datos inventados y con `patch` se sustituye una herramienta por una falsa que explota. No gastan nada y tardan milésimas
-- **A mano para aprender:** en un proyecto real muchas de estas piezas vienen hechas (`ToolNode`, `tools_condition`, `recursion_limit`, `pytest`). Aquí las he hecho a mano para entender qué pasa por dentro
-
-## Limitaciones
-
-- **El `thread_id` separa conversaciones, pero no es seguridad:** quien escriba el mismo nombre de conversación entra en ella. En una app real saldría de algo que ya identifica al cliente (su teléfono en WhatsApp, su login…), no lo escribiría él
-- **Las mayúsculas cuentan:** `Conversacion-1` y `conversacion-1` son conversaciones distintas
-- **El `try/except` puede esconder errores míos:** al editar se me coló `llamada["a"]` en vez de `llamada["name"]` y todas las herramientas daban "Error controlado" sin avisar. La lista `errores` es lo que me permitió verlo
-- **La memoria crece sin límite:** en cada turno se le manda a Claude toda la conversación, así que una conversación muy larga cuesta más
-- **Los tests no comprueban a Claude:** comprueban que mi código reacciona bien. Que Claude elija bien la herramienta lo he comprobado probando el chat (capturas)
-
-## Ejecución
-
-1. Crear el entorno e instalar las librerías:
-   ```
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.lock
-   ```
-2. Hacer una copia de `.env.example` como `.env` y rellenar la clave de OpenRouter y el `MODEL_ID`
-3. Ejecutar el chat:
-   ```
-   python asistente.py
-   ```
-   Para salir: `salir`
-4. Ejecutar los tests (no llaman a Claude, son gratis):
-   ```
-   python -m unittest discover -s tests
-   ```
+```
+python registrar_prompts.py   # solo la primera vez
+python asistente.py           # el chat; para salir, "salir"
+python comparar.py            # la comparación v1 / v2
+python -m unittest discover -s tests
+```
 
 ---
 
 ## English version
 
-**Hotel front-desk assistant with LangGraph** is a terminal chat that plays the receptionist of a fictional hotel. On every message it decides whether to answer directly or to use a tool (a support-ticket status or a help article). It remembers each conversation across restarts, uses at most 2 tools per question and, if a tool fails, returns a controlled error instead of crashing. The model is Claude Haiku through OpenRouter. This is project 5 of my AI Engineering master (thePower): LangGraph.
+In [project 5](https://github.com/juanmisanchezz/asistente-hotel-langgraph) I built a hotel front-desk assistant with LangGraph. Here I connected it to Langfuse and LangSmith so I can see every step of every question: what the model receives, which tool it calls, how long it takes and what it costs.
 
-**Graph**
-
-`START → inicio → chatbot ⇄ herramientas → END`. `inicio` resets the tool counter for each new question; `chatbot` calls Claude (without tools once the counter reaches 2); `herramientas` runs the requested tools and refuses any beyond the second with a "limit reached" message; a conditional edge sends the flow to the tools node or to the end.
-
-**Pieces**
-
-- State: `messages`, `llamadas_herramientas` (tool counter) and `errores`
-- Read-only tools over fictional JSON data: `consultar_ticket` and `buscar_articulo`, which validate the ID format before looking it up
-- Persistent memory with `SqliteSaver` and a `thread_id` per conversation
-- `try/except` around each tool: failures become a controlled error and are recorded in `errores`
-
-**Decisions**
-
-- Built step by step (fixed answer → model → tools → memory → limit), one commit per stage
-- The limit lives in the code, not in the prompt: a "don't make things up" rule in the prompt did not stop the model from inventing the breakfast time
-- Offline tests (`unittest` + `patch`) check my code, not Claude's answers: invalid format, unknown ticket, the 2-tool limit and a tool failure
-
-**Limitations**
-
-- `thread_id` separates conversations but is not authentication
-- The whole history is sent on every turn, so long conversations cost more
-
-**Run**
+- Each question shows up once in each platform, with the query id, conversation, model and prompt version. I turned off LangSmith's automatic tracing because it was duplicating runs.
+- Two prompt versions live in both prompt managers. The chat downloads the one you choose, so every answer is linked to the version that produced it.
+- I wrote the success criteria first and then ran 10 held-out questions with both versions (same model, `temperature=0`). v1 got 8/10 and v2 9/10. v2 costs about 19 % more but is not slower. I had to set the model price by hand in both platforms to see the cost.
+- I forced a tool failure and a 5-second delay. Both point to the `herramientas` node: the failure shows up as a controlled error in its output (not red, because of the `try/except`), and the delay as 5.01 s on the node while the tool inside takes 0.00 s.
+- Emails and secrets are masked before anything is sent. I tested it with a fake email in both platforms. The model still guessed the name "Ana" from the email, so in a real project names would need filtering too.
 
 ```
 pip install -r requirements.lock
-cp .env.example .env   # add your OpenRouter key and MODEL_ID
+python registrar_prompts.py
 python asistente.py
-python -m unittest discover -s tests
+python comparar.py
 ```
