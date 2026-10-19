@@ -1,6 +1,7 @@
 # Asistente del hotel: chatbot que decide si contesta o usa una herramienta
 
 import os
+import time
 from typing import Annotated, TypedDict
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
@@ -103,6 +104,13 @@ def ejecutar_herramientas(estado: Estado) -> dict:
             else:
                 count += 1
                 try:
+                    # Parte 5: fallo y retraso provocados, se activan desde el .env
+                    if os.getenv("FORZAR_FALLO_HERRAMIENTA") == "1":
+                        raise TimeoutError("fallo provocado de la herramienta")
+                    retraso = os.getenv("RETRASO_HERRAMIENTA_SEGUNDOS")
+                    if retraso:
+                        time.sleep(float(retraso))
+
                     if llamada["name"] == "consultar_ticket":
                         texto = consultar_ticket.invoke(llamada["args"])
                     else:
